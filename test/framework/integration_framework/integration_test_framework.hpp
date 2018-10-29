@@ -49,6 +49,12 @@ namespace iroha {
       struct VoteMessage;
     }  // namespace yac
   }    // namespace consensus
+  namespace network {
+    class OrderingServiceTransport;
+  }
+  namespace ordering {
+    class OrderingGateTransportGrpc;
+  }
 }  // namespace iroha
 
 namespace integration_framework {
@@ -232,6 +238,23 @@ namespace integration_framework {
     IntegrationTestFramework &sendQuery(const shared_model::proto::Query &qry);
 
     /**
+     * Send proposal to this peer' s ordering service.
+     * @param proposal - the proposal to send
+     * @return this
+     */
+    IntegrationTestFramework &sendProposal(
+        std::unique_ptr<shared_model::interface::Proposal> proposal);
+
+    /**
+     * Send a batch of transactions to this peer's ordering service.
+     * @param batch - the batch to send
+     * @return this
+     */
+    IntegrationTestFramework &sendBatch(
+        const std::shared_ptr<shared_model::interface::TransactionBatch>
+            &batch);
+
+    /**
      * Send MST state message to this peer.
      * @param src_key - the key of the peer which the message appears to come
      * from
@@ -397,6 +420,8 @@ namespace integration_framework {
         transaction_batch_factory_;
     std::shared_ptr<iroha::network::MstTransportGrpc> mst_transport_;
     std::shared_ptr<iroha::consensus::yac::YacNetwork> yac_transport_;
+    std::shared_ptr<iroha::network::OrderingServiceTransport> os_transport_;
+    std::shared_ptr<iroha::ordering::OrderingGateTransportGrpc> og_transport_;
 
     std::shared_ptr<shared_model::interface::Peer> this_peer_;
 
