@@ -7,12 +7,15 @@
 
 #include "consensus/yac/impl/yac_crypto_provider_impl.hpp"
 #include "consensus/yac/transport/impl/network_impl.hpp"
+#include "consensus/yac/transport/yac_network_interface.hpp"
 #include "consensus/yac/yac_crypto_provider.hpp"
 #include "cryptography/crypto_provider/crypto_defaults.hpp"
 #include "cryptography/default_hash_provider.hpp"
 #include "cryptography/keypair.hpp"
-#include "framework/integration_framework/fake_peer/ordering_gate_network_notifier.hpp"
-#include "framework/integration_framework/fake_peer/ordering_service_network_notifier.hpp"
+#include "framework/integration_framework/fake_peer/network/mst_network_notifier.hpp"
+#include "framework/integration_framework/fake_peer/network/ordering_gate_network_notifier.hpp"
+#include "framework/integration_framework/fake_peer/network/ordering_service_network_notifier.hpp"
+#include "framework/integration_framework/fake_peer/network/yac_network_notifier.hpp"
 #include "framework/result_fixture.hpp"
 #include "interfaces/common_objects/common_objects_factory.hpp"
 #include "main/server_runner.hpp"
@@ -38,8 +41,8 @@ static std::shared_ptr<shared_model::interface::Peer> createPeer(
             peer = std::move(result.value);
           },
           [&address](const iroha::expected::Result<
-              std::unique_ptr<shared_model::interface::Peer>,
-              std::string>::ErrorType &error) {
+                     std::unique_ptr<shared_model::interface::Peer>,
+                     std::string>::ErrorType &error) {
             BOOST_THROW_EXCEPTION(
                 std::runtime_error("Failed to create peer object for peer "
                                    + address + ". " + error.error));
@@ -81,11 +84,13 @@ namespace integration_framework {
                                                     async_call_)),
         og_transport_(
             std::make_shared<OgTransport>(real_peer_->address(), async_call_)),
+        mst_network_notifier_(std::make_shared<MstNetworkNotifier>()),
         yac_network_notifier_(std::make_shared<YacNetworkNotifier>()),
         os_network_notifier_(std::make_shared<OsNetworkNotifier>()),
         og_network_notifier_(std::make_shared<OgNetworkNotifier>()),
         yac_crypto_(std::make_shared<iroha::consensus::yac::CryptoProviderImpl>(
             *keypair_, common_objects_factory)) {
+    mst_transport_->subscribe(mst_network_notifier_);
     yac_transport_->subscribe(yac_network_notifier_);
     os_transport_->subscribe(os_network_notifier_);
     og_transport_->subscribe(og_network_notifier_);
@@ -115,11 +120,6 @@ namespace integration_framework {
             [this](const auto &err) { log_->error("coul not start server!"); });
   }
 
-  void FakePeer::subscribeForMstNotifications(
-      std::shared_ptr<iroha::network::MstTransportNotification> notification) {
-    return mst_transport_->subscribe(notification);
-  }
-
   std::string FakePeer::getAddress() const {
     return listen_ip_ + ":" + std::to_string(internal_port_);
   }
@@ -128,7 +128,13 @@ namespace integration_framework {
     return *keypair_.get();
   }
 
-  rxcpp::observable<FakePeer::YacStatePtr> FakePeer::get_yac_states_observable() {
+  rxcpp::observable<FakePeer::MstMessagePtr>
+  FakePeer::get_mst_states_observable() {
+    return mst_network_notifier_->get_observable();
+  }
+
+  rxcpp::observable<FakePeer::YacMessagePtr>
+  FakePeer::get_yac_states_observable() {
     return yac_network_notifier_->get_observable();
   }
 
@@ -167,7 +173,8 @@ namespace integration_framework {
               signature_with_pubkey = std::move(sig.value);
             },
             [this](iroha::expected::Error<std::string> &reason) {
-              log_->error("Cannot build signature: {}", reason.error);
+              BOOST_THROW_EXCEPTION(std::runtime_error(
+                  "Cannot build signature: " + reason.error));
             });
     return signature_with_pubkey;
   }
@@ -180,16 +187,18 @@ namespace integration_framework {
     return yac_crypto_->getVote(my_yac_hash);
   }
 
-  void FakePeer::sendYacState(const std::vector<iroha::consensus::yac::VoteMessage> &state) {
+  void FakePeer::sendYacState(
+      const std::vector<iroha::consensus::yac::VoteMessage> &state) {
     yac_transport_->sendState(*real_peer_, state);
   }
 
-  void FakePeer::voteForTheSame(const FakePeer::YacStatePtr &incoming_votes) {
+  void FakePeer::voteForTheSame(const FakePeer::YacMessagePtr &incoming_votes) {
     using iroha::consensus::yac::VoteMessage;
     log_->debug("Got a YAC state message with {} votes.",
                 incoming_votes->size());
     if (incoming_votes->size() > 1) {
-      // TODO mboldyrev 24/10/2018: rework ignoring states for accepted commits
+      // TODO mboldyrev 24/10/2018 IR-1821: rework ignoring states for accepted
+      //                                    commits
       log_->debug(
           "Ignoring state with multiple votes, "
           "because it probably refers to an accepted commit.");
