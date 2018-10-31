@@ -10,7 +10,8 @@
 #include <string>
 
 #include <boost/core/noncopyable.hpp>
-#include "framework/integration_framework/fake_peer/yac_network_notifier.hpp"
+#include <rxcpp/rx.hpp>
+#include "framework/integration_framework/fake_peer/network/mst_message.hpp"
 #include "interfaces/iroha_internal/abstract_transport_factory.hpp"
 #include "logger/logger.hpp"
 #include "network/impl/async_grpc_client.hpp"
@@ -40,12 +41,15 @@ namespace iroha {
       class NetworkImpl;
       class YacCryptoProvider;
       class YacHash;
+      class VoteMessage;
     }
   }
 }  // namespace iroha
 class ServerRunner;
 
 namespace integration_framework {
+  class YacNetworkNotifier;
+  class MstNetworkNotifier;
 
   class FakePeer final : public boost::noncopyable {
    public:
@@ -53,6 +57,9 @@ namespace integration_framework {
         shared_model::interface::AbstractTransportFactory<
             shared_model::interface::Transaction,
             iroha::protocol::Transaction>;
+    using MstMessagePtr = std::shared_ptr<MstMessage>;
+    using YacMessagePtr =
+        std::shared_ptr<const std::vector<iroha::consensus::yac::VoteMessage>>;
 
     FakePeer(
         const std::string &listen_ip,
@@ -70,9 +77,6 @@ namespace integration_framework {
 
     void run();
 
-    void subscribeForMstNotifications(
-        std::shared_ptr<iroha::network::MstTransportNotification> notification);
-
     std::string getAddress() const;
 
     const shared_model::crypto::Keypair &getKeypair() const;
@@ -81,12 +85,10 @@ namespace integration_framework {
 
     void disableAgreeAllProposals();
 
-    rxcpp::observable<YacNetworkNotifier::StateMessagePtr>
-    get_yac_states_observable();
+    rxcpp::observable<YacMessagePtr> get_yac_states_observable();
+    rxcpp::observable<MstMessagePtr> get_mst_states_observable();
 
-    void voteForTheSame(
-        const integration_framework::YacNetworkNotifier::StateMessagePtr
-            &incoming_votes);
+    void voteForTheSame(const YacMessagePtr &incoming_votes);
 
     std::shared_ptr<shared_model::interface::Signature> makeSignature(
         const shared_model::crypto::Blob &hash) const;
@@ -120,6 +122,7 @@ namespace integration_framework {
     std::shared_ptr<YacTransport> yac_transport_;
     std::unique_ptr<ServerRunner> internal_server_;
 
+    std::shared_ptr<MstNetworkNotifier> mst_network_notifier_;
     std::shared_ptr<YacNetworkNotifier> yac_network_notifier_;
 
     std::shared_ptr<iroha::consensus::yac::YacCryptoProvider> yac_crypto_;

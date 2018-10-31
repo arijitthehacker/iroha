@@ -25,7 +25,8 @@ add_library(integration_framework
     integration_framework/integration_test_framework.cpp
     integration_framework/iroha_instance.cpp
     integration_framework/fake_peer/fake_peer.cpp
-    integration_framework/fake_peer/yac_network_notifier.cpp
+    integration_framework/fake_peer/network/yac_network_notifier.cpp
+    integration_framework/fake_peer/network/mst_network_notifier.cpp
     )
 target_link_libraries(integration_framework
     application
