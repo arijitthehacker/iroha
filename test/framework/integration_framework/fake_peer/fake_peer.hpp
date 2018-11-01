@@ -83,18 +83,13 @@ namespace integration_framework {
         std::shared_ptr<shared_model::interface::TransactionBatchParser>
             batch_parser,
         std::shared_ptr<shared_model::interface::TransactionBatchFactory>
-            transaction_batch_factory,
-        bool agree_all_proposals = true);
+            transaction_batch_factory);
 
     void run();
 
     std::string getAddress() const;
 
     const shared_model::crypto::Keypair &getKeypair() const;
-
-    void enableAgreeAllProposals();
-
-    void disableAgreeAllProposals();
 
     rxcpp::observable<MstMessagePtr> get_mst_states_observable();
     rxcpp::observable<YacMessagePtr> get_yac_states_observable();
@@ -153,8 +148,6 @@ namespace integration_framework {
     std::unique_ptr<ServerRunner> internal_server_;
 
     std::shared_ptr<iroha::consensus::yac::YacCryptoProvider> yac_crypto_;
-
-    rxcpp::subscription proposal_agreer_subscription_;
 
     logger::Logger log_;
   };
