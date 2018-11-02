@@ -12,6 +12,7 @@
 #include "cryptography/crypto_provider/crypto_defaults.hpp"
 #include "cryptography/default_hash_provider.hpp"
 #include "cryptography/keypair.hpp"
+#include "framework/integration_framework/fake_peer/behaviour/behaviour.hpp"
 #include "framework/integration_framework/fake_peer/network/mst_network_notifier.hpp"
 #include "framework/integration_framework/fake_peer/network/ordering_gate_network_notifier.hpp"
 #include "framework/integration_framework/fake_peer/network/ordering_service_network_notifier.hpp"
@@ -97,6 +98,11 @@ namespace integration_framework {
         "IntegrationTestFramework "
         "(fake peer at "
         + getAddress() + ")");
+  }
+
+  void FakePeer::setBehaviour(std::shared_ptr<FakePeerBehaviour> behaviour) {
+    behaviour_ = behaviour;
+    behaviour_->adopt(shared_from_this());
   }
 
   void FakePeer::run() {
